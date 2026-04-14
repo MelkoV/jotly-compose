@@ -80,7 +80,7 @@ services:
           exit 1
         fi
 
-        if [ ! -f "/etc/letsencrypt/live/$${primary_domain}/fullchain.pem" ]; then
+        if [ ! -f "/etc/letsencrypt/renewal/$${primary_domain}.conf" ]; then
           until certbot certonly --webroot \
             -w /var/www/certbot \
             --email "$${email}" \
