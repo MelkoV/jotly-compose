@@ -1,0 +1,111 @@
+services:
+  app:
+    build:
+      context: ../jotup
+      dockerfile: ../jotly-compose/docker/app/Dockerfile
+      additional_contexts:
+        compose_src: .
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "9000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - jotly
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${FORWARD_REDIS_PORT:-6380}:6379"
+    command: >
+      sh -c "redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD:-redis}\""
+    volumes:
+      - app-redis:/data
+    networks:
+      - jotly
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - -a
+        - "${REDIS_PASSWORD:-redis}"
+        - ping
+      retries: 3
+      timeout: 5s
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.jotly.ru}
+      additional_contexts:
+        frontend_src: ../jotly-front
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    depends_on:
+      - app
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    networks:
+      - jotly
+
+  certbot:
+    image: certbot/certbot:latest
+    depends_on:
+      - nginx
+    env_file:
+      - .env
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    networks:
+      - jotly
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -eu
+        primary_domain="jotly.ru"
+        email="$${LETSENCRYPT_EMAIL}"
+
+        if [ -z "$${email}" ]; then
+          echo "LETSENCRYPT_EMAIL is required" >&2
+          exit 1
+        fi
+
+        if [ ! -f "/etc/letsencrypt/live/$${primary_domain}/fullchain.pem" ]; then
+          until certbot certonly --webroot \
+            -w /var/www/certbot \
+            --email "$${email}" \
+            --agree-tos \
+            --no-eff-email \
+            -d jotly.ru \
+            -d api.jotly.ru; do
+            sleep 30
+          done
+          touch /var/www/certbot/.reload-nginx
+        fi
+
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet && touch /var/www/certbot/.reload-nginx
+          sleep 12h
+        done
+
+networks:
+  jotly:
+    driver: bridge
+
+volumes:
+  app-redis:
+    driver: local
+  certbot-etc:
+    driver: local
+  certbot-www:
+    driver: local
