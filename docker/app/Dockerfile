@@ -39,10 +39,12 @@ COPY --from=composer:2.9.5 /usr/bin/composer /usr/bin/composer
 
 ADD docker/php/php.ini /usr/local/etc/php/conf.d/40-custom.ini
 ADD docker/php/output.conf /usr/local/etc/php/conf.d/output.conf
-ADD docker/php/zz-docker.conf /usr/local/etc/php-fpm.d/zz-docker.conf
+COPY --from=compose_src docker/app/zz-tcp-fpm.conf /usr/local/etc/php-fpm.d/zz-docker.conf
 
 COPY . /var/www/html
 WORKDIR /var/www/html
+
+RUN composer install --no-dev
 
 COPY --from=compose_src docker/app/supervisord.conf /etc/supervisor/supervisord.conf
 
