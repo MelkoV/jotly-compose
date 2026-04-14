@@ -80,12 +80,19 @@ services:
           exit 1
         fi
 
+        if [ ! -f "/etc/letsencrypt/renewal/$${primary_domain}.conf" ] && [ -d "/etc/letsencrypt/live/$${primary_domain}" ]; then
+          rm -rf "/etc/letsencrypt/live/$${primary_domain}" \
+                 "/etc/letsencrypt/archive/$${primary_domain}" \
+                 "/etc/letsencrypt/renewal/$${primary_domain}.conf"
+        fi
+
         if [ ! -f "/etc/letsencrypt/renewal/$${primary_domain}.conf" ]; then
           until certbot certonly --webroot \
             -w /var/www/certbot \
             --email "$${email}" \
             --agree-tos \
             --no-eff-email \
+            --cert-name "$${primary_domain}" \
             -d jotly.ru \
             -d api.jotly.ru; do
             sleep 30

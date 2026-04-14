@@ -1,11 +1,12 @@
 #!/bin/sh
 set -eu
 
-cert_dir="/etc/letsencrypt/live/jotly.ru"
-cert_file="${cert_dir}/fullchain.pem"
-key_file="${cert_dir}/privkey.pem"
+active_dir="/etc/nginx/certs/live"
+fallback_dir="/etc/nginx/certs/fallback"
+cert_file="${fallback_dir}/fullchain.pem"
+key_file="${fallback_dir}/privkey.pem"
 
-mkdir -p "${cert_dir}"
+mkdir -p "${active_dir}" "${fallback_dir}"
 mkdir -p /var/www/certbot
 
 if [ ! -f "${cert_file}" ] || [ ! -f "${key_file}" ]; then
@@ -34,3 +35,7 @@ EOF
         -out "${cert_file}" \
         -config /tmp/jotly-cert.cnf
 fi
+
+rm -f "${active_dir}/fullchain.pem" "${active_dir}/privkey.pem"
+ln -sf "${cert_file}" "${active_dir}/fullchain.pem"
+ln -sf "${key_file}" "${active_dir}/privkey.pem"
